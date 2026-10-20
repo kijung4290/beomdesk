@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "mode": "portable",
+  "from": "0.2.2",
+  "baseline": "Local QA build using the current updater with an older app version",
+  "to": "0.2.3",
+  "actualGithubDownload": true,
+  "restarted": true,
+  "profilePreserved": true,
+  "executableReplaced": true,
+  "downloadChecksumVerified": true,
+  "portableExecutableHashVerified": true,
+  "testedAt": "2026-10-20T03:46:36.947Z"
+}

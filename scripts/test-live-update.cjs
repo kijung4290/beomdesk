@@ -26,7 +26,7 @@ function closeOwned(pid, exe) {
     },
   );
 }
-async function waitFor(check, timeout = 180000) {
+async function waitFor(check, timeout = 180000, interval = 500) {
   const end = Date.now() + timeout;
   let last;
   while (Date.now() < end) {
@@ -36,7 +36,7 @@ async function waitFor(check, timeout = 180000) {
     } catch (e) {
       last = e;
     }
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
   throw last || new Error("Timed out");
 }
@@ -113,6 +113,18 @@ async function freePort() {
     assert.equal(old.version, FROM);
     assert.equal(old.mode, mode);
     assert.equal(await page.locator("#editor").inputValue(), marker);
+    await waitFor(
+      async () => {
+        const published = await (
+          await fetch(
+            "https://github.com/kijung4290/beomdesk/releases/latest/download/portable-latest.json",
+          )
+        ).json();
+        return published.version === TO;
+      },
+      180000,
+      5000,
+    );
     const available = await page.evaluate(() => window.beom.update("check"));
     assert.equal(available.status, "available", JSON.stringify(available));
     assert.equal(available.version, TO);

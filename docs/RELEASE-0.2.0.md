@@ -1,3 +1,5 @@
+최신 수정본은 [0.2.3](https://github.com/kijung4290/beomdesk/releases/tag/v0.2.3)을 사용해 주세요. 초기 배포본의 무설치 업데이트 적용 문제를 수정했습니다.
+
 Electron 기반 범피스 작업실의 첫 배포입니다.
 
 - 설치형: `BeomDesk-0.2.0-setup.exe`

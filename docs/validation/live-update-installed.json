@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "mode": "installed",
+  "from": "0.2.2",
+  "baseline": "Published installer",
+  "to": "0.2.3",
+  "actualGithubDownload": true,
+  "restarted": true,
+  "profilePreserved": true,
+  "executableReplaced": true,
+  "downloadChecksumVerified": true,
+  "portableExecutableHashVerified": null,
+  "testedAt": "2026-10-20T03:44:59.665Z"
+}
