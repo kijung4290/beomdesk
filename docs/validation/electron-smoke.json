@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "features": 1926,
+  "directActions": 1747,
+  "templates": 27,
+  "rendererErrors": [],
+  "minimumSizePrimaryActionVisible": true,
+  "version": "0.2.0",
+  "draftPreservedOnImmediateClose": true
+}

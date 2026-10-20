@@ -1,0 +1,76 @@
+{
+  "name": "beomdesk",
+  "productName": "범피스 작업실",
+  "version": "0.2.0",
+  "private": true,
+  "description": "한글 문서 작성과 편집을 위한 Windows 업무 도구",
+  "author": "BeomDesk",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests-js/*.test.cjs",
+    "test:electron": "node scripts/smoke-electron.cjs",
+    "build:backend": "powershell -NoProfile -File scripts/build-backend.ps1",
+    "build:dir": "electron-builder --win --x64 --dir --publish never",
+    "build": "electron-builder --win nsis portable --x64 --publish never && node scripts/release-manifest.cjs",
+    "release:check": "node scripts/release-manifest.cjs --check"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "semver": "7.8.5"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3",
+    "playwright": "1.58.2"
+  },
+  "build": {
+    "appId": "kr.beomdesk.workroom",
+    "productName": "범피스 작업실",
+    "artifactName": "BeomDesk-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "package.json",
+      "update-config.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend-dist/BeomBackend",
+        "to": "backend"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signExecutable": false,
+      "icon": "assets/app.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "BeomDesk-${version}-setup.exe",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "BeomDesk-${version}-portable.exe"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kijung4290",
+        "repo": "beomdesk",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

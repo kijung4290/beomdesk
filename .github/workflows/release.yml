@@ -1,0 +1,43 @@
+name: Windows release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci --no-fund --no-audit
+      - id: metadata
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package version differ' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - run: python -m pip install -r requirements-build.txt
+      - run: python -m unittest discover -s tests -p "test_*.py" -v
+      - run: npm test
+      - run: python build_backend.py
+      - run: npm run test:electron
+      - run: npm run build
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.metadata.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release/BeomDesk-*-setup.exe
+            release/BeomDesk-*-portable.exe
+            release/*.blockmap
+            release/latest.yml
+            release/portable-latest.json
+            release/SHA256SUMS.txt
