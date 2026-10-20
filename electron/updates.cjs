@@ -92,11 +92,13 @@ try {
   $hasher=[System.Security.Cryptography.SHA512]::Create()
   $actual=[Convert]::ToBase64String($hasher.ComputeHash([System.IO.File]::ReadAllBytes($source)))
   if($actual -ne $expected){throw 'Update checksum changed'}
+  [System.IO.File]::WriteAllText($log,'Waiting for app exit')
   Wait-Process -Id ([int]$env:BEOM_UPDATE_PID) -Timeout 30 -ErrorAction SilentlyContinue
   $done=$false
+  $backupMade=$false
   for($attempt=0;$attempt -lt 60;$attempt++) {
     try {
-      Copy-Item -LiteralPath $destination -Destination $backup -Force
+      if(-not $backupMade){Copy-Item -LiteralPath $destination -Destination $backup -Force;$backupMade=$true}
       Copy-Item -LiteralPath $source -Destination $destination -Force
       $copied=[Convert]::ToBase64String($hasher.ComputeHash([System.IO.File]::ReadAllBytes($destination)))
       if($copied -ne $expected){throw 'Copied checksum mismatch'}
@@ -105,7 +107,7 @@ try {
   }
   if(-not $done){throw 'Portable executable could not be replaced'}
   [System.IO.File]::WriteAllText($log,'Updated successfully')
-  Start-Process -FilePath $destination
+  Start-Process -FilePath $destination -WindowStyle Hidden
 } catch {
   if(Test-Path -LiteralPath $backup){Copy-Item -LiteralPath $backup -Destination $destination -Force -ErrorAction SilentlyContinue}
   [System.IO.File]::WriteAllText($log,$_.Exception.Message)
@@ -254,13 +256,15 @@ class UpdateManager extends EventEmitter {
       this.busy = false;
     }
   }
-  install() {
+  async install() {
     if (this.state.status !== "ready" || !this.downloaded)
       throw new Error("업데이트를 먼저 다운로드해 주세요.");
     if (!this.portableFile) {
-      this.updater.quitAndInstall(false, true);
+      this.updater.quitAndInstall(true, true);
       return { restarting: true };
     }
+    const log = path.join(this.dataDir, "updates", "last-update.log");
+    await fs.unlink(log).catch(() => {});
     const helper = spawn(
       path.join(
         process.env.SystemRoot || "C:\\Windows",
@@ -279,6 +283,7 @@ class UpdateManager extends EventEmitter {
       ],
       {
         detached: true,
+        cwd: this.dataDir,
         windowsHide: true,
         stdio: "ignore",
         env: {
@@ -287,14 +292,32 @@ class UpdateManager extends EventEmitter {
           BEOM_UPDATE_DESTINATION: this.portableFile,
           BEOM_UPDATE_SHA512: this.manifest.sha512,
           BEOM_UPDATE_PID: String(process.pid),
-          BEOM_UPDATE_LOG: path.join(
-            this.dataDir,
-            "updates",
-            "last-update.log",
-          ),
+          BEOM_UPDATE_LOG: log,
         },
       },
     );
+    let startupError;
+    helper.once("error", (error) => {
+      startupError = error;
+    });
+    const deadline = Date.now() + 15000;
+    let ready = false;
+    while (Date.now() < deadline) {
+      if (startupError) throw startupError;
+      const message = await fs.readFile(log, "utf8").catch(() => "");
+      if (message === "Waiting for app exit") {
+        ready = true;
+        break;
+      }
+      if (message) throw new Error(message);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!ready) {
+      helper.kill();
+      throw new Error(
+        "업데이트 교체 프로세스를 시작하지 못했습니다. 앱을 다시 시작해 주세요.",
+      );
+    }
     helper.unref();
     this.app.quit();
     return { restarting: true };

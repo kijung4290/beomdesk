@@ -9,7 +9,10 @@ const {
   validateRepository,
   downloadVerified,
   UpdateManager,
+  portableScript,
 } = require("../electron/updates.cjs");
+const { spawn } = require("node:child_process");
+const { EventEmitter } = require("node:events");
 const bytes = Buffer.from("verified portable update fixture");
 const manifest = {
   version: "0.2.1",
@@ -17,6 +20,110 @@ const manifest = {
   size: bytes.length,
   sha512: crypto.createHash("sha512").update(bytes).digest("base64"),
 };
+test("installed updates apply silently and restart only after user approval", async () => {
+  const updater = new EventEmitter();
+  let args;
+  updater.quitAndInstall = (...value) => {
+    args = value;
+  };
+  const manager = new UpdateManager({
+    app: { getVersion: () => "0.2.1" },
+    config: {},
+    dataDir: os.tmpdir(),
+    autoUpdater: updater,
+  });
+  await assert.rejects(manager.install(), /다운로드/);
+  manager.set({ status: "ready" });
+  manager.downloaded = true;
+  await manager.install();
+  assert.deepEqual(args, [true, true]);
+});
+test(
+  "Windows portable helper waits for exit, replaces verified bytes and preserves backup",
+  { skip: process.platform !== "win32", timeout: 30000 },
+  async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "beom-updates-"));
+    const source = path.join(directory, "next.exe"),
+      destination = path.join(directory, "portable.exe"),
+      log = path.join(directory, "update.log");
+    const oldBytes = await fs.readFile(
+      path.join(process.env.SystemRoot, "System32/whoami.exe"),
+    );
+    const newBytes = await fs.readFile(
+      path.join(process.env.SystemRoot, "System32/where.exe"),
+    );
+    await fs.writeFile(source, newBytes);
+    await fs.writeFile(destination, oldBytes);
+    const old = spawn(process.execPath, ["-e", "setTimeout(()=>{},25000)"], {
+      windowsHide: true,
+      stdio: "ignore",
+    });
+    let helper;
+    try {
+      helper = spawn(
+        path.join(
+          process.env.SystemRoot,
+          "System32/WindowsPowerShell/v1.0/powershell.exe",
+        ),
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-WindowStyle",
+          "Hidden",
+          "-Command",
+          portableScript,
+        ],
+        {
+          cwd: directory,
+          windowsHide: true,
+          stdio: "ignore",
+          env: {
+            ...process.env,
+            BEOM_UPDATE_SOURCE: source,
+            BEOM_UPDATE_DESTINATION: destination,
+            BEOM_UPDATE_SHA512: crypto
+              .createHash("sha512")
+              .update(newBytes)
+              .digest("base64"),
+            BEOM_UPDATE_PID: String(old.pid),
+            BEOM_UPDATE_LOG: log,
+          },
+        },
+      );
+      const exited = new Promise((resolve, reject) => {
+        helper.once("error", reject);
+        helper.once("exit", (code) =>
+          code === 0 ? resolve() : reject(new Error("Helper exit " + code)),
+        );
+      });
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline) {
+        if (
+          (await fs.readFile(log, "utf8").catch(() => "")) ===
+          "Waiting for app exit"
+        )
+          break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.equal(await fs.readFile(log, "utf8"), "Waiting for app exit");
+      assert.deepEqual(await fs.readFile(destination), oldBytes);
+      old.kill();
+      await exited;
+      assert.deepEqual(await fs.readFile(destination), newBytes);
+      assert.deepEqual(await fs.readFile(destination + ".previous"), oldBytes);
+      assert.equal(await fs.readFile(log, "utf8"), "Updated successfully");
+    } finally {
+      if (old.exitCode === null) old.kill();
+      if (helper && helper.exitCode === null) helper.kill();
+      assert.ok(
+        path
+          .resolve(directory)
+          .startsWith(path.join(os.tmpdir(), "beom-updates-")),
+      );
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  },
+);
 test("automatic downloads respect the saved preference", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "beom-updates-"));
   try {
