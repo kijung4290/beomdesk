@@ -1,4 +1,4 @@
-const { spawn } = require("node:child_process");
+const { spawn, execFileSync } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const net = require("node:net");
@@ -6,8 +6,26 @@ const crypto = require("node:crypto");
 const assert = require("node:assert/strict");
 const { chromium } = require("playwright");
 const ROOT = path.join(__dirname, "..");
-const FROM = process.env.BEOM_UPDATE_FROM || "0.2.1";
-const TO = process.env.BEOM_UPDATE_TO || "0.2.2";
+const FROM = process.env.BEOM_UPDATE_FROM || "0.2.2";
+const TO = process.env.BEOM_UPDATE_TO || "0.2.3";
+function closeOwned(pid, exe) {
+  execFileSync(
+    path.join(
+      process.env.SystemRoot,
+      "System32/WindowsPowerShell/v1.0/powershell.exe",
+    ),
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "$p=Get-Process -Id ([int]$env:BEOM_QA_PID) -ErrorAction Stop;if($p.Path -ne $env:BEOM_QA_EXE){throw 'Unexpected QA process'};$p.CloseMainWindow() | Out-Null",
+    ],
+    {
+      windowsHide: true,
+      env: { ...process.env, BEOM_QA_PID: String(pid), BEOM_QA_EXE: exe },
+    },
+  );
+}
 async function waitFor(check, timeout = 180000) {
   const end = Date.now() + timeout;
   let last;
@@ -112,9 +130,13 @@ async function freePort() {
       });
     await browser.close().catch(() => {});
     browser = null;
+    const restartProfile =
+      mode === "installed"
+        ? path.join(process.env.APPDATA, "범피스 작업실")
+        : profile;
     const session = await waitFor(async () => {
       const value = JSON.parse(
-        await fs.readFile(path.join(profile, "session.json"), "utf8"),
+        await fs.readFile(path.join(restartProfile, "session.json"), "utf8"),
       );
       return value.version === TO && value;
     });
@@ -129,6 +151,38 @@ async function freePort() {
       .update(await fs.readFile(exe))
       .digest("base64");
     assert.notEqual(after, before);
+    if (mode === "installed") {
+      closeOwned(session.pid, exe);
+      const verifyPort = await freePort();
+      const reopened = spawn(exe, [`--remote-debugging-port=${verifyPort}`], {
+        env: childEnv,
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      await waitFor(
+        async () =>
+          (await fetch(`http://127.0.0.1:${verifyPort}/json/version`)).ok,
+      );
+      const verifyBrowser = await chromium.connectOverCDP(
+        `http://127.0.0.1:${verifyPort}`,
+      );
+      try {
+        const verifyPage = verifyBrowser.contexts()[0].pages()[0];
+        await verifyPage.waitForFunction(
+          () => document.documentElement.dataset.ready === "true",
+        );
+        assert.equal(
+          (await verifyPage.evaluate(() => window.beom.state("get"))).version,
+          TO,
+        );
+        assert.equal(await verifyPage.locator("#editor").inputValue(), marker);
+        await verifyPage.evaluate(() => setTimeout(() => window.close(), 0));
+        await waitFor(() => reopened.exitCode !== null, 20000);
+      } finally {
+        await verifyBrowser.close().catch(() => {});
+        if (reopened.exitCode === null) reopened.kill();
+      }
+    }
     if (mode === "portable") {
       const manifest = await (
         await fetch(
@@ -156,13 +210,16 @@ async function freePort() {
       mode,
       from: old.version,
       baseline:
-        "Local QA build using the current updater with an older app version",
+        mode === "portable"
+          ? "Local QA build using the current updater with an older app version"
+          : "Published installer",
       to: session.version,
       actualGithubDownload: true,
       restarted: true,
       profilePreserved: true,
       executableReplaced: true,
-      checksumVerified: mode === "portable",
+      downloadChecksumVerified: true,
+      portableExecutableHashVerified: mode === "portable" ? true : null,
       testedAt: new Date().toISOString(),
     };
     await fs.writeFile(
@@ -172,7 +229,10 @@ async function freePort() {
     console.log(JSON.stringify(result));
     // This PID comes from the isolated QA profile written by our newly started app.
     assert.ok(Number.isInteger(session.pid) && session.pid > 0);
-    process.kill(session.pid);
+    if (mode === "portable") {
+      // The unpacked portable app lives in its own unique NSIS temporary directory.
+      process.kill(session.pid);
+    }
     finished = true;
   } finally {
     if (browser) await browser.close().catch(() => {});

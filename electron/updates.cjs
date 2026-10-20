@@ -279,15 +279,26 @@ class UpdateManager extends EventEmitter {
         "-WindowStyle",
         "Hidden",
         "-Command",
-        portableScript,
+        "Start-Process -FilePath $env:BEOM_UPDATE_POWERSHELL -ArgumentList @('-NoProfile','-NonInteractive','-WindowStyle','Hidden','-EncodedCommand',$env:BEOM_UPDATE_COMMAND) -WorkingDirectory $env:BEOM_UPDATE_DIRECTORY -WindowStyle Hidden",
       ],
       {
-        detached: true,
+        detached: false,
         cwd: this.dataDir,
         windowsHide: true,
         stdio: "ignore",
         env: {
           ...process.env,
+          BEOM_UPDATE_POWERSHELL: path.join(
+            process.env.SystemRoot || "C:\\Windows",
+            "System32",
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe",
+          ),
+          BEOM_UPDATE_COMMAND: Buffer.from(portableScript, "utf16le").toString(
+            "base64",
+          ),
+          BEOM_UPDATE_DIRECTORY: this.dataDir,
           BEOM_UPDATE_SOURCE: this.downloaded,
           BEOM_UPDATE_DESTINATION: this.portableFile,
           BEOM_UPDATE_SHA512: this.manifest.sha512,

@@ -20,6 +20,72 @@ const manifest = {
   size: bytes.length,
   sha512: crypto.createHash("sha512").update(bytes).digest("base64"),
 };
+test(
+  "real Electron GUI process hands the portable replacement to PowerShell after exit",
+  { skip: process.platform !== "win32", timeout: 30000 },
+  async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "beom-updates-"));
+    let child;
+    try {
+      await fs.mkdir(path.join(directory, "updates"));
+      const oldBytes = await fs.readFile(
+        path.join(process.env.SystemRoot, "System32/whoami.exe"),
+      );
+      const nextBytes = await fs.readFile(
+        path.join(process.env.SystemRoot, "System32/where.exe"),
+      );
+      await fs.writeFile(path.join(directory, "portable.exe"), oldBytes);
+      await fs.writeFile(path.join(directory, "next.exe"), nextBytes);
+      const env = { ...process.env, BEOM_HANDOFF_DIR: directory };
+      delete env.ELECTRON_RUN_AS_NODE;
+      child = spawn(
+        require("electron"),
+        [path.join(__dirname, "handoff-fixture/main.cjs")],
+        { windowsHide: true, stdio: "ignore", env },
+      );
+      const exitCode = await new Promise((resolve, reject) => {
+        child.once("exit", resolve);
+        child.once("error", reject);
+      });
+      const failure = await fs
+        .readFile(path.join(directory, "failure.txt"), "utf8")
+        .catch(() => "");
+      assert.equal(exitCode, 0, failure);
+      const log = path.join(directory, "updates/last-update.log");
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline) {
+        if (
+          (await fs.readFile(log, "utf8").catch(() => "")) ===
+          "Updated successfully"
+        )
+          break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      assert.equal(await fs.readFile(log, "utf8"), "Updated successfully");
+      assert.deepEqual(
+        await fs.readFile(path.join(directory, "portable.exe")),
+        nextBytes,
+      );
+      assert.deepEqual(
+        await fs.readFile(path.join(directory, "portable.exe.previous")),
+        oldBytes,
+      );
+    } finally {
+      if (child && child.exitCode === null) child.kill();
+      assert.ok(
+        path
+          .resolve(directory)
+          .startsWith(path.join(os.tmpdir(), "beom-updates-")),
+      );
+      await fs.rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 20,
+        retryDelay: 100,
+      });
+    }
+  },
+);
 test("installed updates apply silently and restart only after user approval", async () => {
   const updater = new EventEmitter();
   let args;
