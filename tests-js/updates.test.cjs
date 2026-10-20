@@ -120,7 +120,12 @@ test(
           .resolve(directory)
           .startsWith(path.join(os.tmpdir(), "beom-updates-")),
       );
-      await fs.rm(directory, { recursive: true, force: true });
+      await fs.rm(directory, {
+        recursive: true,
+        force: true,
+        maxRetries: 20,
+        retryDelay: 100,
+      });
     }
   },
 );
