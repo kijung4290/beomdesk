@@ -53,9 +53,7 @@ class ActionCatalog:
             self.bridge.open_screen(self.bridge.features[index]['screen'])
             return {'direct':False,'connected':True}
         context=self.bridge.load()
-        context['기본']=context['기본한컴'](self.bridge.session.require())
-        context['한컴']=self.bridge.session.hwp
-        adapter=context['기본']
+        adapter=self.bridge.adapter()
         def visit(node):
             if isinstance(node,ast.Constant):return node.value
             if isinstance(node,(ast.List,ast.Tuple)):return [visit(item) for item in node.elts]

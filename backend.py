@@ -59,6 +59,7 @@ class Backend:
 
     def dispatch(self,method,params):
         if not isinstance(params,dict):raise ValueError('잘못된 작업 인수입니다.')
+        self.bridge.sync_session()
         if method=='bootstrap':
             return {'samples':SAMPLES,'features':[{'id':i,'label':x['control'].removesuffix('버튼'),
                      'screen':x['screen'],'category':x['image'].replace('\\','/').split('/')[1].removesuffix('탭'),

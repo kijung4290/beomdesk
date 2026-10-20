@@ -3,19 +3,23 @@ import tempfile
 import types
 import unittest
 from beomdesk.actions import ActionCatalog
+from beomdesk.legacy import LegacyBridge
 
 
 class FakeBridge:
     def __init__(self,features):
         self.features=features;self.opened=[];self.assets=Path(tempfile.gettempdir())
-        self.calls=[];self.session=types.SimpleNamespace(require=lambda:object(),hwp=None)
+        self.calls=[];self.session=types.SimpleNamespace(require=lambda:object(),hwp=None,generation=0)
         outer=self
         class Adapter:
             def __init__(self,obj):self.대상=obj
             def 글자크기(self,size):outer.calls.append(('font',size))
             def 문장(self,text):outer.calls.append(('text',text))
+            def 복사(self):self.copied='retained state'
+            def 붙임(self):outer.calls.append(('paste',self.copied))
         self.context={'기본한컴':Adapter}
     def load(self):return self.context
+    def adapter(self):return LegacyBridge.adapter(self)
     def open_screen(self,screen):self.opened.append(screen)
 
 
@@ -35,6 +39,13 @@ class ActionTests(unittest.TestCase):
             bridge=FakeBridge([{'callback_source':'def action():\n return '+value,'screen':'safe'}])
             catalog=ActionCatalog(bridge,tempfile.gettempdir())
             self.assertIsNone(catalog.expressions[0],value)
+
+    def test_copy_state_survives_separate_tool_actions(self):
+        bridge=FakeBridge([{'callback_source':'def action():\n return 기본.복사()','screen':'test'},
+                           {'callback_source':'def action():\n return 기본.붙임()','screen':'test'}])
+        catalog=ActionCatalog(bridge,tempfile.gettempdir())
+        catalog.execute(0);catalog.execute(1)
+        self.assertEqual(bridge.calls,[('paste','retained state')])
 
 
 if __name__=='__main__':unittest.main()

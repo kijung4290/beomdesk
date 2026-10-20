@@ -5,15 +5,21 @@ import operator
 
 
 def date_difference(start,end):
-    a=date.fromisoformat(start.strip())
-    b=date.fromisoformat(end.strip())
+    try:
+        a=date.fromisoformat(start.strip())
+        b=date.fromisoformat(end.strip())
+    except ValueError as exc:
+        raise ValueError('시작일과 종료일을 YYYY-MM-DD 형식으로 입력해 주세요.') from exc
     return (b-a).days
 
 
 def calculate(expression):
     if len(expression)>300:
         raise ValueError('계산식은 300자 이내로 입력해 주세요.')
-    tree=ast.parse(expression.replace(',',''),mode='eval')
+    try:
+        tree=ast.parse(expression.replace(',',''),mode='eval')
+    except SyntaxError as exc:
+        raise ValueError('계산식을 확인해 주세요. 예: 100000 * 0.1') from exc
     operations={ast.Add:operator.add,ast.Sub:operator.sub,ast.Mult:operator.mul,
                 ast.Div:operator.truediv,ast.Mod:operator.mod}
     def visit(node,depth=0):

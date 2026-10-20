@@ -34,6 +34,8 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(calculate('(1,000 - 100) * 0.1'),90)
         with self.assertRaises(ValueError):calculate('__import__("os")')
         with self.assertRaises(ValueError):calculate('1/0')
+        with self.assertRaises(ValueError):calculate('')
+        with self.assertRaises(ValueError):date_difference('','2026-10-20')
 
     def test_calendar_boundaries(self):
         self.assertEqual(date_difference('2024-02-28','2024-03-01'),2)

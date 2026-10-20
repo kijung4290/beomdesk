@@ -6,6 +6,7 @@ class HwpSession:
     def __init__(self):
         self.hwp = None
         self.owned = False
+        self.generation = 0
 
     def connect(self, new=False, visible=True):
         import pythoncom
@@ -44,6 +45,7 @@ class HwpSession:
                     except OSError:continue
         except (OSError,pythoncom.com_error):pass
         self.hwp=obj
+        self.generation += 1
         return self
 
     def require(self):

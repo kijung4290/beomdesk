@@ -31,6 +31,8 @@ const ROOT = path.join(__dirname, "..");
     const bootstrap = await page.evaluate(() => window.beom.call("bootstrap"));
     assert.equal(bootstrap.features.length, 1926);
     assert.equal(bootstrap.templates.length, 27);
+    const engineCheck = await page.evaluate(() => window.beom.call("self_test"));
+    assert.ok(engineCheck.legacyDefinitions > 100);
     assert.ok(bootstrap.features.filter((x) => x.direct).length > 1000);
     await page.locator('[data-page="tools"]').click();
     await page.locator("#tool-search").fill("셀병합");

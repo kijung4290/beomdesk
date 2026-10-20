@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.pyc binary
+*.png binary
+*.ico binary
+*.hwp binary
+*.hwpx binary

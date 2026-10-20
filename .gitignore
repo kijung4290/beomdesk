@@ -16,3 +16,4 @@ prepare_runtime.py
 beomdesk/ui.py
 tests/check_ui.py
 integration-result.json
+.qa/

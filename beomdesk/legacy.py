@@ -69,9 +69,7 @@ class LegacyBridge:
     def open_screen(self,screen):
         import tkinter as tk
         context=self.load()
-        obj=self.session.require()
-        context['한컴']=obj
-        context['기본']=context['기본한컴'](obj)
+        self.adapter()
         function=context.get(screen)
         if not callable(function):
             raise RuntimeError('선택한 화면의 구성 함수를 찾지 못했습니다.')
@@ -93,3 +91,18 @@ class LegacyBridge:
         function(inner,0,0,620,1400)
         canvas.configure(scrollregion=(0,0,620,1400))
         return window
+
+    def adapter(self):
+        context=self.load()
+        target=self.session.require()
+        generation=getattr(self.session,'generation',0)
+        if '기본' not in context or context.get('_session_generation')!=generation:
+            context['기본']=context['기본한컴'](target)
+            context['_session_generation']=generation
+        self.session.hwp=context['기본'].대상
+        context['한컴']=self.session.hwp
+        return context['기본']
+
+    def sync_session(self):
+        if self.context and '기본' in self.context and self.context.get('_session_generation')==getattr(self.session,'generation',0):
+            self.session.hwp=self.context['기본'].대상
