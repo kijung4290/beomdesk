@@ -33,6 +33,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.metadata.outputs.version }}
+          body_path: docs/RELEASE-${{ steps.metadata.outputs.version }}.md
           generate_release_notes: true
           files: |
             release/BeomDesk-*-setup.exe

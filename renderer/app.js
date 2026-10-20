@@ -564,6 +564,9 @@ $("install-update").addEventListener("click", () =>
 $("auto-check").addEventListener("change", () =>
   window.beom.state("save", { autoCheck: $("auto-check").checked }),
 );
+$("auto-download").addEventListener("change", () =>
+  window.beom.state("save", { autoDownload: $("auto-download").checked }),
+);
 window.beom.onEvent((event) => {
   if (event.event === "update") renderUpdate(event.value);
   if (event.event === "tool-error") {
@@ -644,6 +647,7 @@ async function initialize() {
     );
     $("editor").value = profile.draft || Object.values(bootstrap.samples)[0];
     $("auto-check").checked = profile.autoCheck !== false;
+    $("auto-download").checked = profile.autoDownload !== false;
     const today = new Date();
     const iso = [
       today.getFullYear(),
@@ -670,5 +674,8 @@ async function initialize() {
 }
 initialize();
 window.addEventListener("beforeunload", () => {
-  window.beom.flushDraft({draft: $("editor").value, favorites: [...state.favorites]});
+  window.beom.flushDraft({
+    draft: $("editor").value,
+    favorites: [...state.favorites],
+  });
 });

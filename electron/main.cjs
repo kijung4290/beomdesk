@@ -27,7 +27,7 @@ let win,
   backend,
   updates,
   closing = false,
-  profile = { draft: "", favorites: [], autoCheck: true },
+  profile = { draft: "", favorites: [], autoCheck: true, autoDownload: true },
   saveQueue = Promise.resolve();
 const portableFile = process.env.PORTABLE_EXECUTABLE_FILE || "";
 if (process.env.PORTABLE_EXECUTABLE_DIR)
@@ -76,6 +76,7 @@ else {
         dataDir,
         portableFile,
         autoUpdater,
+        autoDownload: () => profile.autoDownload !== false,
       });
       updates.on("state", (value) => send({ event: "update", value }));
       const rendererRoot = path.join(ROOT, "renderer");
@@ -137,6 +138,17 @@ else {
       win.once("ready-to-show", () => win.show());
       registerIPC(dataDir);
       await win.loadURL("beom://app/index.html");
+      await fs
+        .writeFile(
+          path.join(dataDir, "session.json"),
+          JSON.stringify({
+            version: app.getVersion(),
+            mode: portableFile ? "portable" : "installed",
+            startedAt: new Date().toISOString(),
+            pid: process.pid,
+          }),
+        )
+        .catch(() => {});
       if (profile.autoCheck) setTimeout(() => updates.check(), 6000).unref();
     })
     .catch((error) => {
@@ -169,13 +181,19 @@ function registerIPC(dataDir) {
   ipcMain.on("flush-profile", (event, params = {}) => {
     try {
       validateSender(event);
-      if (typeof params.draft === "string" && params.draft.length <= 300000) profile.draft = params.draft;
-      if (Array.isArray(params.favorites)) profile.favorites = params.favorites.filter(x => Number.isInteger(x) && x >= 0 && x < 10000).slice(0, 3000);
+      if (typeof params.draft === "string" && params.draft.length <= 300000)
+        profile.draft = params.draft;
+      if (Array.isArray(params.favorites))
+        profile.favorites = params.favorites
+          .filter((x) => Number.isInteger(x) && x >= 0 && x < 10000)
+          .slice(0, 3000);
       const temporary = path.join(dataDir, "profile.flush");
       fsSync.writeFileSync(temporary, JSON.stringify(profile), "utf8");
       fsSync.renameSync(temporary, path.join(dataDir, "profile.json"));
       event.returnValue = true;
-    } catch { event.returnValue = false; }
+    } catch {
+      event.returnValue = false;
+    }
   });
   const allowed = new Set([
     "bootstrap",
@@ -223,6 +241,8 @@ function registerIPC(dataDir) {
         ].slice(0, 3000);
       if (typeof params.autoCheck === "boolean")
         profile.autoCheck = params.autoCheck;
+      if (typeof params.autoDownload === "boolean")
+        profile.autoDownload = params.autoDownload;
       await saveProfile(dataDir);
       return { saved: true };
     }

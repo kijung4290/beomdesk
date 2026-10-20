@@ -120,6 +120,7 @@ class UpdateManager extends EventEmitter {
     portableFile,
     fetchImpl = fetch,
     autoUpdater,
+    autoDownload = () => false,
   }) {
     super();
     this.app = app;
@@ -128,6 +129,7 @@ class UpdateManager extends EventEmitter {
     this.portableFile = portableFile;
     this.fetch = fetchImpl;
     this.updater = autoUpdater;
+    this.autoDownload = autoDownload;
     this.state = {
       status: "idle",
       mode: portableFile ? "portable" : "installed",
@@ -217,6 +219,10 @@ class UpdateManager extends EventEmitter {
       return this.set({ status: "error", message: error.message });
     } finally {
       this.busy = false;
+      if (this.state.status === "available" && this.autoDownload()) {
+        const timer = setTimeout(() => this.download(), 0);
+        timer.unref();
+      }
     }
   }
   async download() {

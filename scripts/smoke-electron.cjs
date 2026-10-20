@@ -31,7 +31,9 @@ const ROOT = path.join(__dirname, "..");
     const bootstrap = await page.evaluate(() => window.beom.call("bootstrap"));
     assert.equal(bootstrap.features.length, 1926);
     assert.equal(bootstrap.templates.length, 27);
-    const engineCheck = await page.evaluate(() => window.beom.call("self_test"));
+    const engineCheck = await page.evaluate(() =>
+      window.beom.call("self_test"),
+    );
     assert.ok(engineCheck.legacyDefinitions > 100);
     assert.ok(bootstrap.features.filter((x) => x.direct).length > 1000);
     await page.locator('[data-page="tools"]').click();
@@ -75,9 +77,17 @@ const ROOT = path.join(__dirname, "..");
       BrowserWindow.getAllWindows()[0].setSize(1020, 700),
     );
     await page.waitForFunction(() => innerWidth <= 1020 && innerHeight <= 700);
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
     const bounds = await page.locator("#create-document").boundingBox();
-    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    const viewport = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
     await page.screenshot({ path: path.join(out, "electron-compact.png") });
     assert.ok(
       bounds.y + bounds.height <= viewport.height,
@@ -99,10 +109,15 @@ const ROOT = path.join(__dirname, "..");
   } finally {
     await app.close();
   }
-  const saved = JSON.parse(await fs.readFile(path.join(profile, "profile.json"), "utf8"));
+  const saved = JSON.parse(
+    await fs.readFile(path.join(profile, "profile.json"), "utf8"),
+  );
   assert.equal(saved.draft, "종료 직전 초안 보관 검증");
   result.draftPreservedOnImmediateClose = true;
-  await fs.writeFile(path.join(ROOT, "test-results", "electron-smoke.json"), JSON.stringify(result, null, 2));
+  await fs.writeFile(
+    path.join(ROOT, "test-results", "electron-smoke.json"),
+    JSON.stringify(result, null, 2),
+  );
   console.log(JSON.stringify(result));
 })().catch((error) => {
   console.error(error);
